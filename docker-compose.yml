@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      - MOCK_MODE=true
+      - LOG_LEVEL=INFO
+      - CORS_ALLOWED_ORIGINS=["http://localhost:5173","http://localhost:80"]
+      - AUTH_JWT_SECRET=docker-dev-secret-change-in-production
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    environment:
+      - VITE_API_URL=http://localhost:8080
+      - VITE_WS_URL=ws://localhost:8080
+    depends_on:
+      backend:
+        condition: service_healthy

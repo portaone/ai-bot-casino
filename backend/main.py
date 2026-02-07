@@ -1,5 +1,7 @@
+import asyncio
 import logging
 import importlib
+from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -8,6 +10,9 @@ from core.rqid_in_logs import AddRequestID
 import os
 from logging.handlers import RotatingFileHandler
 from logging import Formatter
+
+from modules.game_engine import GameEngine
+from modules.ws_manager import WebSocketManager
 
 # Configure file logging if enabled
 if settings.log_file:
@@ -45,7 +50,12 @@ logging.getLogger("watchfiles").setLevel(logging.WARNING)
 logging.getLogger("watchfiles.main").setLevel(logging.WARNING)
 
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
+
+# Global game engine and WebSocket manager instances
+# These are accessed by routers via: from main import game_engine, ws_manager
+game_engine: Optional[GameEngine] = None
+ws_manager: Optional[WebSocketManager] = None
 
 
 @asynccontextmanager
@@ -69,11 +79,28 @@ async def lifespan(app: FastAPI):
         logging.info("MOCK MODE ENABLED - Using in-memory storage")
         logging.info("=" * 60)
 
+    # Initialize WebSocket manager and game engine
+    global ws_manager, game_engine
+    ws_manager = WebSocketManager()
+    game_engine = GameEngine(ws_manager=ws_manager)
+
+    # Start game engine as background task
+    engine_task = asyncio.create_task(game_engine.run())
+    logging.info("Game engine started as background task")
+
     logging.info(f"AI Bot Casino API v{VERSION} started")
 
     yield
 
+    # Shutdown game engine
     logging.info("AI Bot Casino API shutting down...")
+    game_engine.stop()
+    engine_task.cancel()
+    try:
+        await engine_task
+    except asyncio.CancelledError:
+        pass
+    logging.info("Game engine stopped")
 
 
 app = FastAPI(
@@ -98,7 +125,7 @@ app.add_middleware(
 logging.info(f"CORS allowed origins: {allowed_origins}")
 
 # Load routers dynamically
-routes_to_load = ["health", "auth"]
+routes_to_load = ["health", "auth", "bot", "games", "spectator"]
 for route_name in routes_to_load:
     route_name = route_name.strip()
     if route_name:
@@ -118,6 +145,26 @@ for route_name in routes_to_load:
             raise e
         except Exception as e:
             logging.error(f"Error loading router {route_name}: {str(e)}")
+
+
+# A2A router (at root level for /.well-known/agent.json and /a2a)
+try:
+    from a2a.server import router as a2a_router
+    app.include_router(a2a_router)
+    logging.info("Loaded A2A router")
+except ImportError as e:
+    logging.warning(f"A2A router not available: {e}")
+
+# MCP server mount
+try:
+    from mcp.server import mcp_server
+    mcp_app = mcp_server.streamable_http_app()
+    app.mount("/mcp", mcp_app)
+    logging.info("MCP server mounted at /mcp")
+except ImportError as e:
+    logging.warning(f"MCP server not available: {e}")
+except Exception as e:
+    logging.warning(f"Failed to mount MCP server: {e}")
 
 
 if __name__ == "__main__":

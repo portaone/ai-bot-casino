@@ -9,3 +9,4 @@ mailersend>=0.6.0
 dnspython>=2.7.0
 disposable-email-domains>=0.0.103
 python-multipart>=0.0.18
+mcp>=1.0.0

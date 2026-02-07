@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.namecheap.com)",
+      "WebSearch",
+      "WebFetch(domain:who.is)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_close",
+      "Bash(\"C:\\\\prog\\\\agent-casino\\\\.venv\\\\Scripts\\\\python.exe\" --version)",
+      "Bash(dir:*)",
+      "Bash(xargs:*)",
+      "Bash(Get-ChildItem C:progagent-casinobackend -Recurse -Name)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nPhase 1: Backend foundation — scaffolding, models, auth, routers\n\n- Core infrastructure: FirestoreDict, InMemoryCache, request ID tracing, CasinoError hierarchy\n- Data models: UserInfo, BotProfile, BetType, PlaceBetRequest, RoundResult, TableStatus, etc.\n- Database layer: InMemoryDict for mock mode, FirestoreDict for production \\(5 collections\\)\n- Auth system: Passwordless OTP registration/login, JWT for users, API token for bots\n- Email service: MailerSend with dry-run mode, OTP + welcome email types\n- Routers: health check, auth endpoints \\(register, login, verify-otp, verify-magic-link, setup-bot, me\\)\n- Entry point: FastAPI app with lifespan, CORS, dynamic router loading, rotating file logs\n- Deployment: Dockerfile \\(Python 3.13-slim\\), start-web-server.sh, requirements.txt\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Environment files
+.env
+.env_pydantic
+!.env_pydantic.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+frontend/dist/
+frontend/build/
+
+# Logs
+logs/
+*.log
+
+# Docker
+.docker/
+
+# Test / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Firestore emulator
+firestore-debug.log
+ui-debug.log
+
+# Samples (reference only, not part of the project)
+SAMPLES/

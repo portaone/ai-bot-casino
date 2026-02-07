@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  background: #08070D;
+  color: #F2F0FF;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0F0E17;
+}
+::-webkit-scrollbar-thumb {
+  background: #5E5A7E;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9B97B8;
+}
+
+/* Custom utilities */
+@layer utilities {
+  .gold-gradient {
+    background: linear-gradient(135deg, #F0C246, #C49A1A);
+  }
+  .neon-gradient {
+    background: linear-gradient(135deg, #00E5A0, #00B87A);
+  }
+  .card-glow {
+    box-shadow: 0 0 20px rgba(240, 194, 70, 0.05);
+  }
+}

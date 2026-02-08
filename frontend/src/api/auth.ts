@@ -54,6 +54,7 @@ export interface UserInfo {
   email: string;
   bot_id?: string;
   created_at: string;
+  mcp_url?: string;
 }
 
 export const authApi = {

@@ -34,9 +34,13 @@ export function OwnerDashboard() {
         const response = await authApi.getMe();
         console.log('User data fetched:', response.data);
 
-        // Update store with fresh user data (includes bot_id)
+        // Update store with fresh user data (includes bot_id and mcp_url)
         if (accessToken) {
           setAuth(accessToken, response.data);
+        }
+        // Store mcp_url from backend (uses API_PUBLIC_URL setting)
+        if (response.data.mcp_url) {
+          useAuthStore.setState({ mcpUrl: response.data.mcp_url });
         }
 
         setBotStats({

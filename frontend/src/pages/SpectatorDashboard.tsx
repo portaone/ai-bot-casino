@@ -7,6 +7,7 @@ import { RouletteWheel } from '@/components/RouletteWheel';
 import { ResultHistory } from '@/components/ResultHistory';
 import { TableInfo } from '@/components/TableInfo';
 import { BetFeed } from '@/components/BetFeed';
+import { ChatFeed } from '@/components/ChatFeed';
 import { Leaderboard } from '@/components/Leaderboard';
 
 export function SpectatorDashboard() {
@@ -69,6 +70,7 @@ export function SpectatorDashboard() {
           {/* Right Column - Activity Feed */}
           <div className="flex-1 space-y-6">
             <BetFeed />
+            <ChatFeed />
             <Leaderboard />
           </div>
         </div>

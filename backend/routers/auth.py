@@ -153,18 +153,22 @@ async def regenerate_token_endpoint(
     return regenerate_bot_token(user_id=user_id, users=db_users, bots=db_bots)
 
 
-@router.get("/me", response_model=UserInfo)
+@router.get("/me")
 async def get_me_endpoint(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db_users=Depends(get_db_handle_users),
-) -> UserInfo:
-    """Get current user's info."""
+):
+    """Get current user's info plus server-side config like MCP URL."""
     token_data = extract_jwt_data(credentials.credentials)
     user_id = token_data.get("user")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    return get_user_info(user_id=user_id, users=db_users)
+    user = get_user_info(user_id=user_id, users=db_users)
+    api_base = settings.api_public_url or settings.frontend_url.replace('5173', '8080')
+    data = user.model_dump()
+    data["mcp_url"] = f"{api_base}/mcp"
+    return data
 
 
 def initialize():

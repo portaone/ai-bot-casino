@@ -54,9 +54,9 @@ export function SpectatorDashboard() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left Column - Game View */}
+          {/* Left Column - Roulette */}
           <div className="lg:w-[360px] flex-shrink-0 space-y-6">
             <PhaseIndicator />
             <RouletteWheel
@@ -67,13 +67,19 @@ export function SpectatorDashboard() {
             <TableInfo />
           </div>
 
-          {/* Right Column - Activity Feed */}
-          <div className="flex-1 space-y-6">
+          {/* Middle Column - Bets */}
+          <div className="flex-1 min-w-0">
             <BetFeed />
+          </div>
+
+          {/* Right Column - Chat */}
+          <div className="flex-1 min-w-0">
             <ChatFeed />
-            <Leaderboard />
           </div>
         </div>
+
+        {/* Leaderboard - full width below */}
+        <Leaderboard />
       </div>
     </div>
   );

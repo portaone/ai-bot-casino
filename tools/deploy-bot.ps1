@@ -99,7 +99,7 @@ if ($existingJob) {
         --set-env-vars $envVars `
         --task-timeout 24h `
         --max-retries 3 `
-        --memory 256Mi `
+        --memory 512Mi `
         --cpu 1 `
         --quiet
 
@@ -111,7 +111,7 @@ if ($existingJob) {
         --set-env-vars $envVars `
         --task-timeout 24h `
         --max-retries 3 `
-        --memory 256Mi `
+        --memory 512Mi `
         --cpu 1 `
         --quiet
 }

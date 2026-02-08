@@ -53,6 +53,9 @@ export function useWebSocket() {
             break;
 
           case 'round_result':
+            // Settlement phase — backend doesn't send a separate phase_change for this,
+            // so we set the phase here to ensure BetFeed shows results instead of empty bets
+            setPhase('settlement', 0);
             setResult({
               round_id: data.round_id,
               round_number: data.round_number,

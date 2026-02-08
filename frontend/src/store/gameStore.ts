@@ -42,6 +42,8 @@ interface GameState {
   currentBets: BetRecord[];
   latestResult: RoundResult | null;
   resultHistory: number[];
+  roundHistory: RoundResult[];
+  selectedRound: RoundResult | null;
   leaderboard: LeaderboardEntry[];
   connected: boolean;
 
@@ -52,6 +54,7 @@ interface GameState {
   setLeaderboard: (entries: LeaderboardEntry[]) => void;
   setConnected: (connected: boolean) => void;
   addToHistory: (number: number) => void;
+  selectRound: (round: RoundResult | null) => void;
 }
 
 export const useGameStore = create<GameState>()((set) => ({
@@ -63,6 +66,8 @@ export const useGameStore = create<GameState>()((set) => ({
   currentBets: [],
   latestResult: null,
   resultHistory: [],
+  roundHistory: [],
+  selectedRound: null,
   leaderboard: [],
   connected: false,
 
@@ -109,7 +114,9 @@ export const useGameStore = create<GameState>()((set) => ({
     return {
       latestResult: result,
       resultHistory: [result.result_number, ...state.resultHistory].slice(0, 20),
+      roundHistory: [result, ...state.roundHistory].slice(0, 20),
       currentBets: [],
+      selectedRound: null,
     };
   }),
 
@@ -118,4 +125,5 @@ export const useGameStore = create<GameState>()((set) => ({
   addToHistory: (number) => set((state) => ({
     resultHistory: [number, ...state.resultHistory].slice(0, 20),
   })),
+  selectRound: (round) => set({ selectedRound: round }),
 }));

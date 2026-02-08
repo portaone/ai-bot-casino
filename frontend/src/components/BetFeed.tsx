@@ -1,80 +1,129 @@
 import { useGameStore } from '@/store/gameStore';
 import { BotAvatar } from './BotAvatar';
-import { Trophy } from 'lucide-react';
+import { Trophy, X } from 'lucide-react';
+import { getColor } from '@/tokens';
 
-export function BetFeed() {
-  const phase = useGameStore((s) => s.phase);
-  const currentBets = useGameStore((s) => s.currentBets);
-  const latestResult = useGameStore((s) => s.latestResult);
+interface RoundResultData {
+  round_number: number;
+  result_number: number;
+  result_color: string;
+  bets: Array<{
+    bot_id: string;
+    bot_name: string;
+    bot_avatar_seed: string;
+    bet_type: string;
+    bet_value?: number;
+    amount: number;
+    payout: number;
+    is_winner: boolean;
+  }>;
+  total_wagered: number;
+  total_payout: number;
+}
 
-  const showResults = (phase === 'settlement' || phase === 'pause') && latestResult && latestResult.bets.length > 0;
+function RoundResultView({ result, onClose }: { result: RoundResultData; onClose?: () => void }) {
+  const bets = result.bets;
+  const winners = bets.filter((b) => b.is_winner);
+  const losers = bets.filter((b) => !b.is_winner);
 
-  // During settlement/pause, show round results; otherwise show live bets
-  if (showResults) {
-    const bets = latestResult.bets;
-    const winners = bets.filter((b) => b.is_winner);
-    const losers = bets.filter((b) => !b.is_winner);
-
-    return (
-      <div className="bg-card rounded-xl border border-white/5 p-4 h-full">
-        <div className="text-xs text-text-muted font-mono tracking-wider mb-3">
-          ROUND #{latestResult.round_number} RESULTS
+  return (
+    <div className="bg-card rounded-xl border border-white/5 p-4 h-full">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-text-muted font-mono tracking-wider">
+            ROUND #{result.round_number} RESULTS
+          </div>
+          <div
+            className="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold text-white font-mono"
+            style={{ background: getColor(result.result_number) }}
+          >
+            {result.result_number}
+          </div>
         </div>
-        <div className="space-y-2 overflow-y-auto max-h-[400px]">
-          {winners.length > 0 && (
-            <>
-              {winners.map((bet, i) => {
-                const net = bet.payout - bet.amount;
-                return (
-                  <div key={`w-${i}`} className="flex items-center gap-3 bg-neon/5 border border-neon/20 rounded-lg px-3 py-2">
-                    <BotAvatar seed={bet.bot_avatar_seed} size={28} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm text-text-primary truncate flex items-center gap-1.5">
-                        {bet.bot_name}
-                        <Trophy className="w-3.5 h-3.5 text-gold" />
-                      </div>
-                    </div>
-                    <div className="text-right flex items-baseline gap-2">
-                      <span className={`text-xs font-medium ${getBetColor(bet.bet_type)}`}>
-                        {formatBetType(bet.bet_type, bet.bet_value)}
-                      </span>
-                      <span className="text-sm font-bold text-neon font-mono">
-                        +{net} BC
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-          {losers.length > 0 && (
-            <>
-              {losers.map((bet, i) => (
-                <div key={`l-${i}`} className="flex items-center gap-3 bg-surface/50 rounded-lg px-3 py-2 opacity-70">
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-text-muted hover:text-text-primary transition-colors p-1"
+            title="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      <div className="space-y-2 overflow-y-auto max-h-[400px]">
+        {bets.length === 0 ? (
+          <div className="text-text-muted text-sm py-4 text-center">
+            No bets were placed this round
+          </div>
+        ) : (
+          <>
+            {winners.map((bet, i) => {
+              const net = bet.payout - bet.amount;
+              return (
+                <div key={`w-${i}`} className="flex items-center gap-3 bg-neon/5 border border-neon/20 rounded-lg px-3 py-2">
                   <BotAvatar seed={bet.bot_avatar_seed} size={28} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-text-secondary truncate">{bet.bot_name}</div>
+                    <div className="text-sm text-text-primary truncate flex items-center gap-1.5">
+                      {bet.bot_name}
+                      <Trophy className="w-3.5 h-3.5 text-gold" />
+                    </div>
                   </div>
                   <div className="text-right flex items-baseline gap-2">
                     <span className={`text-xs font-medium ${getBetColor(bet.bet_type)}`}>
                       {formatBetType(bet.bet_type, bet.bet_value)}
                     </span>
-                    <span className="text-sm font-bold text-accent-red font-mono">
-                      -{bet.amount} BC
+                    <span className="text-sm font-bold text-neon font-mono">
+                      +{net} BC
                     </span>
                   </div>
                 </div>
-              ))}
-            </>
-          )}
-          {/* Summary line */}
-          <div className="pt-2 mt-2 border-t border-white/5 flex justify-between text-xs font-mono text-text-muted">
-            <span>Wagered: {latestResult.total_wagered} BC</span>
-            <span>Paid out: {latestResult.total_payout} BC</span>
-          </div>
+              );
+            })}
+            {losers.map((bet, i) => (
+              <div key={`l-${i}`} className="flex items-center gap-3 bg-surface/50 rounded-lg px-3 py-2 opacity-70">
+                <BotAvatar seed={bet.bot_avatar_seed} size={28} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-text-secondary truncate">{bet.bot_name}</div>
+                </div>
+                <div className="text-right flex items-baseline gap-2">
+                  <span className={`text-xs font-medium ${getBetColor(bet.bet_type)}`}>
+                    {formatBetType(bet.bet_type, bet.bet_value)}
+                  </span>
+                  <span className="text-sm font-bold text-accent-red font-mono">
+                    -{bet.amount} BC
+                  </span>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+        {/* Summary line */}
+        <div className="pt-2 mt-2 border-t border-white/5 flex justify-between text-xs font-mono text-text-muted">
+          <span>Wagered: {result.total_wagered} BC</span>
+          <span>Paid out: {result.total_payout} BC</span>
         </div>
       </div>
-    );
+    </div>
+  );
+}
+
+export function BetFeed() {
+  const phase = useGameStore((s) => s.phase);
+  const currentBets = useGameStore((s) => s.currentBets);
+  const latestResult = useGameStore((s) => s.latestResult);
+  const selectedRound = useGameStore((s) => s.selectedRound);
+  const selectRound = useGameStore((s) => s.selectRound);
+
+  // If a past round is selected from ResultHistory, show it
+  if (selectedRound) {
+    return <RoundResultView result={selectedRound} onClose={() => selectRound(null)} />;
+  }
+
+  // During settlement/pause, show latest round results
+  const showResults = (phase === 'settlement' || phase === 'pause') && latestResult && latestResult.bets.length > 0;
+
+  if (showResults) {
+    return <RoundResultView result={latestResult} />;
   }
 
   // Live bets view (during betting/spinning)

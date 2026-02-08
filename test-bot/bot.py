@@ -50,7 +50,12 @@ class CasinoBot:
         no_refill: bool = False,
         verbose: bool = False,
     ):
-        self.api_url = api_url.rstrip("/")
+        # Strip /mcp suffix — users often paste the MCP URL from the dashboard
+        api_url = api_url.rstrip("/")
+        if api_url.endswith("/mcp"):
+            api_url = api_url[:-4]
+            logging.info(f"Stripped /mcp suffix from API URL → {api_url}")
+        self.api_url = api_url
         self.token = token
         self.table_id = table_id
         self.max_rounds = max_rounds

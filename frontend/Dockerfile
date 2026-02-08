@@ -21,8 +21,9 @@ FROM nginx:alpine
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
+# Copy nginx configurations (default for docker-compose, cloudrun for Cloud Run)
 COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx/nginx-cloudrun.conf /etc/nginx/conf.d/nginx-cloudrun.conf
 
 # Copy and make entrypoint script executable
 COPY docker-entrypoint.sh /docker-entrypoint.sh

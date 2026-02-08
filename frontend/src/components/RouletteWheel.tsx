@@ -7,11 +7,40 @@ interface RouletteWheelProps {
   size?: number;
 }
 
+const SEG_ANGLE = (Math.PI * 2) / 37;
+// Pointer is at top = -PI/2 in canvas coordinates
+const POINTER_ANGLE = -Math.PI / 2;
+
+/**
+ * Calculate the target wheel angle so that the given number's segment
+ * center sits directly under the pointer (top of wheel).
+ */
+function getTargetAngle(num: number, currentAngle: number): number {
+  const idx = WHEEL_NUMBERS.indexOf(num);
+  if (idx === -1) return currentAngle;
+
+  // The center of segment `idx` is at: angleRef + idx * SEG_ANGLE + SEG_ANGLE/2
+  // We need: angleRef + idx * SEG_ANGLE + SEG_ANGLE/2 = POINTER_ANGLE (mod 2PI)
+  // So: angleRef = POINTER_ANGLE - idx * SEG_ANGLE - SEG_ANGLE/2
+  const baseTarget = POINTER_ANGLE - idx * SEG_ANGLE - SEG_ANGLE / 2;
+
+  // Ensure we spin forward (positive direction) at least 3 full rotations
+  // from the current angle for a nice visual effect
+  const fullRotations = Math.PI * 2 * 3;
+  let target = baseTarget;
+  while (target < currentAngle + fullRotations) {
+    target += Math.PI * 2;
+  }
+  return target;
+}
+
 export function RouletteWheel({ spinning, resultNumber, size = 320 }: RouletteWheelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number>(0);
   const angleRef = useRef(0);
-  const speedRef = useRef(0);
+  const spinningRef = useRef(false);
+  const targetAngleRef = useRef<number | null>(null);
+  const spinStartTimeRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,10 +76,9 @@ export function RouletteWheel({ spinning, resultNumber, size = 320 }: RouletteWh
       ctx!.fill();
 
       // Number segments
-      const segAngle = (Math.PI * 2) / 37;
       WHEEL_NUMBERS.forEach((num, i) => {
-        const startA = angleRef.current + i * segAngle;
-        const endA = startA + segAngle;
+        const startA = angleRef.current + i * SEG_ANGLE;
+        const endA = startA + SEG_ANGLE;
         ctx!.beginPath();
         ctx!.moveTo(cx, cy);
         ctx!.arc(cx, cy, r - 4, startA, endA);
@@ -62,7 +90,7 @@ export function RouletteWheel({ spinning, resultNumber, size = 320 }: RouletteWh
         ctx!.stroke();
 
         // Number text
-        const midA = startA + segAngle / 2;
+        const midA = startA + SEG_ANGLE / 2;
         const tr = r - 22;
         const tx = cx + Math.cos(midA) * tr;
         const ty = cy + Math.sin(midA) * tr;
@@ -98,7 +126,7 @@ export function RouletteWheel({ spinning, resultNumber, size = 320 }: RouletteWh
       ctx!.font = `9px ${font.body}`;
       ctx!.fillText('BotChips', cx, cy + 10);
 
-      // Ball marker
+      // Ball marker (pointer at top)
       ctx!.beginPath();
       ctx!.moveTo(cx, cy - r + 2);
       ctx!.lineTo(cx - 6, cy - r - 8);
@@ -107,19 +135,45 @@ export function RouletteWheel({ spinning, resultNumber, size = 320 }: RouletteWh
       ctx!.fillStyle = tokens.accent.gold;
       ctx!.fill();
 
-      if (speedRef.current > 0.001) {
-        angleRef.current += speedRef.current;
-        speedRef.current *= 0.985;
+      // Animation logic
+      if (targetAngleRef.current !== null) {
+        // Easing towards target angle
+        const target = targetAngleRef.current;
+        const remaining = target - angleRef.current;
+        if (Math.abs(remaining) < 0.001) {
+          angleRef.current = target;
+          targetAngleRef.current = null;
+          spinningRef.current = false;
+        } else {
+          // Ease-out: move a fraction of the remaining distance
+          angleRef.current += remaining * 0.04;
+        }
+      } else if (spinningRef.current) {
+        // Free spin (constant speed) while waiting for result
+        angleRef.current += 0.25;
       }
+
       animRef.current = requestAnimationFrame(draw);
     }
     draw();
     return () => cancelAnimationFrame(animRef.current);
   }, [size]);
 
+  // Start spinning
   useEffect(() => {
-    if (spinning) speedRef.current = 0.35;
+    if (spinning) {
+      spinningRef.current = true;
+      targetAngleRef.current = null;
+      spinStartTimeRef.current = Date.now();
+    }
   }, [spinning]);
+
+  // When result arrives and spinning stops, animate to target
+  useEffect(() => {
+    if (!spinning && resultNumber !== null) {
+      targetAngleRef.current = getTargetAngle(resultNumber, angleRef.current);
+    }
+  }, [spinning, resultNumber]);
 
   const colorClass = resultNumber !== null
     ? resultNumber === 0 ? 'bg-roulette-green' : getColor(resultNumber) === tokens.roulette.red ? 'bg-roulette-red' : 'bg-roulette-black'

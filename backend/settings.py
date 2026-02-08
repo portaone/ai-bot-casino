@@ -23,7 +23,6 @@ class Settings(BaseSettings):
 
     # Test users configuration
     test_users_enabled: bool = Field(default=False, description="Enable test users with predefined OTP")
-    test_users_emails: List[str] = Field(default_factory=list, description="List of test user email addresses")
     test_users_otp: str = Field(default="123456", description="Predefined OTP code for test users")
 
     # reCAPTCHA settings
@@ -53,6 +52,10 @@ class Settings(BaseSettings):
 
     # Frontend URL for email links
     frontend_url: str = Field(default="http://localhost:5173", description="Frontend base URL for email links")
+
+    # Public API URL for bot-facing endpoints (MCP, A2A, REST)
+    # If not set, falls back to frontend_url with port 8080
+    api_public_url: Optional[str] = Field(default=None, description="Public API base URL shown to bots (e.g., https://play.aibotcasino.com)")
 
     # Logging settings
     log_headers: List[str] = Field(default_factory=lambda: ["client-ip"], description="Headers to log")

@@ -5,10 +5,19 @@ import { useGameStore } from '@/store/gameStore';
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const mountedRef = useRef(true);
   const { setTableState, addBet, setResult, setLeaderboard, setConnected, setPhase } = useGameStore();
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (!mountedRef.current) return;
+
+    // Close any existing connection first to prevent duplicates
+    if (wsRef.current) {
+      const existing = wsRef.current;
+      wsRef.current = null;
+      existing.onclose = null; // prevent reconnect from old close handler
+      existing.close();
+    }
 
     const wsUrl = `${config.wsUrl}/ws/spectator`;
     const ws = new WebSocket(wsUrl);
@@ -66,8 +75,10 @@ export function useWebSocket() {
     ws.onclose = () => {
       console.log('WebSocket disconnected');
       setConnected(false);
-      // Auto-reconnect after 3 seconds
-      reconnectTimerRef.current = setTimeout(connect, 3000);
+      // Only reconnect if still mounted and this is still the active connection
+      if (mountedRef.current && wsRef.current === ws) {
+        reconnectTimerRef.current = setTimeout(connect, 3000);
+      }
     };
 
     ws.onerror = (error) => {
@@ -78,10 +89,16 @@ export function useWebSocket() {
   }, [setTableState, addBet, setResult, setLeaderboard, setConnected, setPhase]);
 
   useEffect(() => {
+    mountedRef.current = true;
     connect();
     return () => {
+      mountedRef.current = false;
       clearTimeout(reconnectTimerRef.current);
-      wsRef.current?.close();
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // prevent reconnect on cleanup close
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
   }, [connect]);
 

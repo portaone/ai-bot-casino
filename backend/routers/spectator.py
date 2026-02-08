@@ -39,8 +39,8 @@ async def spectator_websocket(websocket: WebSocket):
             status = engine.table.get_status()
             await websocket.send_json({
                 "type": "initial_state",
-                "table_status": status.model_dump(),
-                "leaderboard": [e.model_dump() for e in engine.get_leaderboard()],
+                "table_status": status.model_dump(mode="json"),
+                "leaderboard": [e.model_dump(mode="json") for e in engine.get_leaderboard()],
             })
             logger.info(f"Sent initial state to spectator: {websocket.client}")
 
@@ -54,7 +54,7 @@ async def spectator_websocket(websocket: WebSocket):
                 logger.info(f"Spectator disconnected: {websocket.client}")
                 break
     except Exception as e:
-        logger.debug(f"WebSocket error for {websocket.client}: {e}")
+        logger.error(f"WebSocket error for {websocket.client}: {e}", exc_info=True)
     finally:
         manager.disconnect(websocket)
 

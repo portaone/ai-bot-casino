@@ -20,6 +20,21 @@ from core.types import (
 )
 from core.email_validate import validate_email
 
+# Hardcoded test emails that always get OTP 123456 and skip email sending
+TEST_EMAILS = {"test@test.com", "test@porta1.com"}
+
+
+def _is_test_email(email: str) -> bool:
+    """Check if email is a test user."""
+    return email in TEST_EMAILS
+
+
+def _get_otp_code(email: str) -> str:
+    """Get OTP code - fixed for test users, random for real users."""
+    if _is_test_email(email):
+        return settings.test_users_otp
+    return str(random.randint(100000, 999999))
+
 
 def register_user(req: RegisterUserRequest, fastapi_request: Request,
                   candidate_users, users, otps) -> RegisterOrLoginResponse:
@@ -41,17 +56,12 @@ def register_user(req: RegisterUserRequest, fastapi_request: Request,
     # Check if user already exists
     from core.firestore_dict import FirestoreEqualsFilter
     for x in users.find(filters=[FirestoreEqualsFilter("email", proper_email)]):
-        raise HTTPException(status_code=400, detail="User already exists")
+        raise HTTPException(status_code=400, detail="An account with this email already exists. Please log in instead.")
 
     req.email = proper_email
 
     # Generate OTP
-    if proper_email == "test@test.com":
-        otp_code = "123456"
-    elif settings.test_users_enabled and proper_email in settings.test_users_emails:
-        otp_code = settings.test_users_otp
-    else:
-        otp_code = str(random.randint(100000, 999999))
+    otp_code = _get_otp_code(proper_email)
 
     exp_delta = timedelta(minutes=settings.auth_otp_expires)
     otp_expires_at = datetime.now(timezone.utc) + exp_delta
@@ -80,32 +90,34 @@ def register_user(req: RegisterUserRequest, fastapi_request: Request,
     )
     otps[otp_id] = otp
 
-    # Send OTP email
+    # Send OTP email (skip for test users)
     name = req.first_name or "Bot Owner"
     frontend_url = req.callback_url or settings.frontend_url
     magic_link = f"{frontend_url}/auth/verify?otp_id={otp_id}&magic_token={magic_token}"
 
-    try:
-        from modules.email_service import send_email, EmailType, EmailRecipient
-        send_email(
-            recipient_list=[EmailRecipient(email=proper_email, name=name)],
-            email_type=EmailType.SEND_OTP_REGISTRATION,
-            attributes={
-                "otp_code": otp_code,
-                "otp_expires_in": settings.auth_otp_expires,
-                "name": name,
-                "email": req.email,
-                "magic_link": magic_link,
-            }
-        )
-    except Exception as e:
-        logging.error(f"Failed to send OTP registration email to {proper_email}: {str(e)}")
-        del otps[otp_id]
-        del candidate_users[user_id]
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to send verification email. Please try again."
-        )
+    if _is_test_email(proper_email):
+        logging.info(f"Test user {proper_email}: skipping email, OTP={otp_code}")
+    else:
+        try:
+            from modules.email_service import send_email, EmailType, EmailRecipient
+            send_email(
+                recipient_list=[EmailRecipient(email=proper_email, name=name)],
+                email_type=EmailType.SEND_OTP_REGISTRATION,
+                attributes={
+                    "otp": otp_code,
+                    "otp_expires": str(settings.auth_otp_expires),
+                    "name": name,
+                    "magic_link": magic_link,
+                }
+            )
+        except Exception as e:
+            logging.error(f"Failed to send OTP registration email to {proper_email}: {str(e)}")
+            del otps[otp_id]
+            del candidate_users[user_id]
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to send verification email. Please try again."
+            )
 
     logging.info(f"Registration OTP sent: user_id={user_id}, email={proper_email}")
     return RegisterOrLoginResponse(otp_id=otp_id, otp_expires_at=otp.otp_expires_at)
@@ -116,12 +128,7 @@ def login_user(req: LoginUserRequest, users, otps) -> RegisterOrLoginResponse:
 
     user_email = req.email.strip().lower()
 
-    if user_email == "test@test.com":
-        otp_code = "123456"
-    elif settings.test_users_enabled and user_email in settings.test_users_emails:
-        otp_code = settings.test_users_otp
-    else:
-        otp_code = str(random.randint(100000, 999999))
+    otp_code = _get_otp_code(user_email)
 
     otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.auth_otp_expires)
 
@@ -149,26 +156,28 @@ def login_user(req: LoginUserRequest, users, otps) -> RegisterOrLoginResponse:
     frontend_url = req.callback_url or settings.frontend_url
     magic_link = f"{frontend_url}/auth/verify?otp_id={otp_id}&magic_token={magic_token}"
 
-    try:
-        from modules.email_service import send_email, EmailType, EmailRecipient
-        send_email(
-            recipient_list=[EmailRecipient(email=user_email, name=name)],
-            email_type=EmailType.SEND_OTP_LOGIN,
-            attributes={
-                "otp_code": otp_code,
-                "otp_expires_in": settings.auth_otp_expires,
-                "name": name,
-                "email": user_email,
-                "magic_link": magic_link,
-            }
-        )
-    except Exception as e:
-        logging.error(f"Failed to send OTP login email to {user_email}: {str(e)}")
-        del otps[otp_id]
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to send verification email. Please try again."
-        )
+    if _is_test_email(user_email):
+        logging.info(f"Test user {user_email}: skipping email, OTP={otp_code}")
+    else:
+        try:
+            from modules.email_service import send_email, EmailType, EmailRecipient
+            send_email(
+                recipient_list=[EmailRecipient(email=user_email, name=name)],
+                email_type=EmailType.SEND_OTP_LOGIN,
+                attributes={
+                    "otp": otp_code,
+                    "otp_expires": str(settings.auth_otp_expires),
+                    "name": name,
+                    "magic_link": magic_link,
+                }
+            )
+        except Exception as e:
+            logging.error(f"Failed to send OTP login email to {user_email}: {str(e)}")
+            del otps[otp_id]
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to send verification email. Please try again."
+            )
 
     logging.info(f"Login OTP sent: user_id={user_id}, email={user_email}")
     return RegisterOrLoginResponse(otp_id=otp_id, otp_expires_at=otp_expires_at)
@@ -319,10 +328,41 @@ def setup_bot(user_id: str, req: SetupBotRequest, users, bots) -> SetupBotRespon
 
     logging.info(f"Bot created: {bot_id} ({req.bot_name}) for user {user_id}")
 
+    api_base = settings.api_public_url or settings.frontend_url.replace('5173', '8080')
     return SetupBotResponse(
         bot_id=bot_id,
         api_token=raw_token,
-        mcp_url=f"{settings.frontend_url.replace('5173', '8080')}/mcp",
+        mcp_url=f"{api_base}/mcp",
+    )
+
+
+def regenerate_bot_token(user_id: str, users, bots) -> SetupBotResponse:
+    """Regenerate the API token for the user's bot, invalidating the old one."""
+    user = users.get(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.bot_id:
+        raise HTTPException(status_code=400, detail="User does not have a bot")
+
+    bot = bots.get(user.bot_id)
+    if bot is None:
+        raise HTTPException(status_code=404, detail="Bot not found")
+
+    # Generate new API token (same pattern as setup_bot)
+    raw_token = f"abc_sk_{secrets.token_hex(20)}"
+    token_hash = hash_api_token(raw_token)
+
+    # Update bot with new token hash
+    bots.update(user.bot_id, {"api_token_hash": token_hash})
+
+    logging.info(f"API token regenerated for bot {user.bot_id} (user {user_id})")
+
+    api_base = settings.api_public_url or settings.frontend_url.replace('5173', '8080')
+    return SetupBotResponse(
+        bot_id=user.bot_id,
+        api_token=raw_token,
+        mcp_url=f"{api_base}/mcp",
     )
 
 

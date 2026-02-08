@@ -9,6 +9,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { VerifyPage } from '@/pages/VerifyPage';
 import { OwnerDashboard } from '@/pages/OwnerDashboard';
 import { DisclaimerPage } from '@/pages/DisclaimerPage';
+import { HowItWorksPage } from '@/pages/HowItWorksPage';
 import { useAuthStore } from '@/store/authStore';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -25,6 +26,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/watch" element={<SpectatorDashboard />} />
         <Route path="/disclaimer" element={<DisclaimerPage />} />
+        <Route path="/how-it-works" element={<HowItWorksPage />} />
       </Route>
 
       {/* Auth Routes */}

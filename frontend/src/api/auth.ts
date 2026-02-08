@@ -72,6 +72,9 @@ export const authApi = {
   setupBot: (data: SetupBotRequest) =>
     apiClient.post<SetupBotResponse>('/api/v1/auth/setup-bot', data),
 
+  regenerateToken: () =>
+    apiClient.post<SetupBotResponse>('/api/v1/auth/regenerate-token'),
+
   getMe: () =>
     apiClient.get<UserInfo>('/api/v1/auth/me'),
 };

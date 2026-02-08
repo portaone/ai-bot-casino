@@ -68,23 +68,42 @@ export const useGameStore = create<GameState>()((set) => ({
 
   setPhase: (phase, timeRemaining) => set({ phase, timeRemaining }),
 
-  setTableState: (data) => set({
-    phase: data.phase || 'idle',
-    timeRemaining: data.time_remaining || 0,
-    roundNumber: data.round_number || 0,
-    seatedBots: data.seated_bots || [],
-    currentBets: data.current_bets || [],
+  setTableState: (data) => set((state) => {
+    const incomingBets = data.current_bets || [];
+    const phase = data.phase || 'idle';
+    // During spinning/settlement, preserve existing bets if server sends empty list
+    // (bets placed during betting phase should remain visible)
+    const shouldPreserveBets = (phase === 'spinning' || phase === 'settlement')
+      && incomingBets.length === 0 && state.currentBets.length > 0;
+
+    return {
+      phase,
+      timeRemaining: data.time_remaining || 0,
+      roundNumber: data.round_number || 0,
+      seatedBots: data.seated_bots || [],
+      currentBets: shouldPreserveBets ? state.currentBets : incomingBets,
+    };
   }),
 
-  addBet: (bet) => set((state) => ({
-    currentBets: [...state.currentBets, bet],
-  })),
+  addBet: (bet) => set((state) => {
+    // Deduplicate: skip if identical bet already exists (same bot, type, value, amount)
+    const isDuplicate = state.currentBets.some(
+      (b) => b.bot_id === bet.bot_id && b.bet_type === bet.bet_type
+        && b.bet_value === bet.bet_value && b.amount === bet.amount
+    );
+    if (isDuplicate) return state;
+    return { currentBets: [...state.currentBets, bet] };
+  }),
 
-  setResult: (result) => set((state) => ({
-    latestResult: result,
-    resultHistory: [result.result_number, ...state.resultHistory].slice(0, 20),
-    currentBets: [],
-  })),
+  setResult: (result) => set((state) => {
+    // Deduplicate: skip if this round was already recorded
+    if (state.latestResult?.round_number === result.round_number) return state;
+    return {
+      latestResult: result,
+      resultHistory: [result.result_number, ...state.resultHistory].slice(0, 20),
+      currentBets: [],
+    };
+  }),
 
   setLeaderboard: (entries) => set({ leaderboard: entries }),
   setConnected: (connected) => set({ connected }),

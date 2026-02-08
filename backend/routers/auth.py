@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from request_trace import RouteWithLogging
 from modules.auth import (
     register_user, login_user, verify_otp, verify_magic_link,
-    get_user_info, setup_bot,
+    get_user_info, setup_bot, regenerate_bot_token,
 )
 from modules.db import (
     get_db_handle_users, get_db_handle_candidate_users, get_db_handle_otps,
@@ -136,6 +136,21 @@ async def setup_bot_endpoint(
         raise HTTPException(status_code=401, detail="Invalid token")
 
     return setup_bot(user_id=user_id, req=req, users=db_users, bots=db_bots)
+
+
+@router.post("/regenerate-token", response_model=SetupBotResponse)
+async def regenerate_token_endpoint(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db_users=Depends(get_db_handle_users),
+    db_bots=Depends(get_db_handle_bots),
+) -> SetupBotResponse:
+    """Regenerate API token for the user's bot. Invalidates the old token."""
+    token_data = extract_jwt_data(credentials.credentials)
+    user_id = token_data.get("user")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    return regenerate_bot_token(user_id=user_id, users=db_users, bots=db_bots)
 
 
 @router.get("/me", response_model=UserInfo)

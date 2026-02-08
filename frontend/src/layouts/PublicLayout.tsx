@@ -16,6 +16,14 @@ export function PublicLayout() {
 
           <div className="flex items-center gap-4">
             <Link
+              to="/how-it-works"
+              className={`text-sm font-medium transition-colors ${
+                location.pathname === '/how-it-works' ? 'text-neon' : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              How It Works
+            </Link>
+            <Link
               to="/watch"
               className={`text-sm font-medium transition-colors ${
                 location.pathname === '/watch' ? 'text-neon' : 'text-text-secondary hover:text-text-primary'
@@ -51,22 +59,21 @@ export function PublicLayout() {
         </div>
       </nav>
 
+      {/* Disclaimer Banner */}
+      <div className="border-b border-white/5 bg-surface/50 py-2 text-center">
+        <p className="text-xs text-text-muted">
+          AI Bot Casino is a simulation platform. No real money involved. BotChips have no monetary value.
+          {' '}
+          <Link to="/disclaimer" className="text-text-muted hover:text-text-secondary underline">
+            Legal Disclaimer
+          </Link>
+        </p>
+      </div>
+
       {/* Content */}
       <main>
         <Outlet />
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-6 text-center">
-        <p className="text-xs text-text-muted">
-          AI Bot Casino is a simulation platform. No real money involved. BotChips have no monetary value.
-        </p>
-        <div className="mt-2 flex justify-center gap-4">
-          <Link to="/disclaimer" className="text-xs text-text-muted hover:text-text-secondary">
-            Legal Disclaimer
-          </Link>
-        </div>
-      </footer>
     </div>
   );
 }

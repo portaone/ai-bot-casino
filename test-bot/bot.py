@@ -112,6 +112,7 @@ class CasinoBot:
     async def _game_loop(self):
         """Polling-based game loop."""
         last_processed_round = 0
+        idle_rejoin_attempted = False
 
         while self._running:
             # Check stop conditions
@@ -144,9 +145,20 @@ class CasinoBot:
             phase = status.get("phase", "idle")
             time_remaining = status.get("time_remaining", 0)
             round_number = status.get("round_number", 0)
+            bot_count = status.get("bot_count", 0)
 
             if self.verbose:
-                logger.debug(f"Phase: {phase}, Round: #{round_number}, Time: {time_remaining:.1f}s")
+                logger.debug(f"Phase: {phase}, Round: #{round_number}, Time: {time_remaining:.1f}s, Bots: {bot_count}")
+
+            # Detect server restart: table is IDLE with no bots seated
+            if phase == "idle" and bot_count == 0:
+                if not idle_rejoin_attempted:
+                    logger.warning("Table is IDLE with 0 bots — possible server restart. Attempting to rejoin...")
+                    await self._rejoin_table()
+                    idle_rejoin_attempted = True
+            else:
+                # Reset flag once table leaves IDLE (rejoin worked)
+                idle_rejoin_attempted = False
 
             # Place bet during betting phase
             if phase == "betting" and time_remaining > 3.0 and self._bet_placed_for_round != round_number:
@@ -265,6 +277,20 @@ class CasinoBot:
             logger.warning(f"Refill failed: {e.response.text}")
         except Exception as e:
             logger.warning(f"Refill error: {e}")
+
+    async def _rejoin_table(self):
+        """Attempt to rejoin the table (e.g., after server restart)."""
+        try:
+            resp = await self.client.post(f"/api/v1/tables/{self.table_id}/join")
+            resp.raise_for_status()
+            logger.info(f"Rejoined table '{self.table_id}' successfully")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                logger.info(f"Rejoin: already at table or table issue: {e.response.text}")
+            else:
+                logger.error(f"Failed to rejoin table: {e}")
+        except Exception as e:
+            logger.error(f"Rejoin error: {e}")
 
     async def _leave_and_summary(self):
         """Leave the table and print session summary."""

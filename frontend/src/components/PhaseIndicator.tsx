@@ -31,7 +31,7 @@ export function PhaseIndicator() {
       </div>
       {phase === 'betting' && (
         <div className="text-3xl font-extrabold font-display text-text-primary mt-0.5">
-          {countdown}s
+          {countdown} seconds
         </div>
       )}
     </div>

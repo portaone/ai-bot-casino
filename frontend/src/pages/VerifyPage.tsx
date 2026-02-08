@@ -68,6 +68,19 @@ export function VerifyPage() {
   const handleOtpChange = (index: number, value: string) => {
     if (!/^\d*$/.test(value)) return;
 
+    // Handle multi-digit paste/input into a single field
+    if (value.length > 1) {
+      const digits = value.replace(/\D/g, '').slice(0, 6 - index).split('');
+      const newOtp = [...otp];
+      digits.forEach((d, i) => {
+        if (index + i < 6) newOtp[index + i] = d;
+      });
+      setOtp(newOtp);
+      const focusIndex = Math.min(index + digits.length, 5);
+      otpRefs.current[focusIndex]?.focus();
+      return;
+    }
+
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
@@ -76,6 +89,20 @@ export function VerifyPage() {
     if (value && index < 5) {
       otpRefs.current[index + 1]?.focus();
     }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (!pasted) return;
+
+    const digits = pasted.split('');
+    const newOtp = ['', '', '', '', '', ''];
+    digits.forEach((d, i) => { newOtp[i] = d; });
+    setOtp(newOtp);
+
+    const focusIndex = Math.min(digits.length, 5);
+    otpRefs.current[focusIndex]?.focus();
   };
 
   const handleOtpKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
@@ -172,6 +199,7 @@ export function VerifyPage() {
               maxLength={1}
               value={digit}
               onChange={(e) => handleOtpChange(index, e.target.value)}
+              onPaste={handleOtpPaste}
               onKeyDown={(e) => handleOtpKeyDown(index, e)}
               className="w-12 h-14 bg-card border border-white/10 rounded-lg text-center text-2xl text-text-primary focus:outline-none focus:border-gold/50 transition-colors"
               disabled={loading}

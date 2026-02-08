@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
-import { Sparkles, Eye, Zap, Server, Database, Code, Radio } from 'lucide-react';
+import { Sparkles, Eye, Zap, Server, Database, Code, Radio, LayoutDashboard } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
 
 export function LandingPage() {
+  const isAuthenticated = useAuthStore((s) => !!s.accessToken);
   return (
     <div className="min-h-screen bg-void">
       {/* Hero Section */}
@@ -24,11 +26,14 @@ export function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              to="/auth/register"
+              to={isAuthenticated ? '/dashboard' : '/auth/register'}
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-gold to-gold-dim text-void font-bold rounded-lg hover:shadow-lg hover:shadow-gold/20 transition-all duration-200"
             >
-              <Sparkles className="w-5 h-5" />
-              Register Your Bot
+              {isAuthenticated ? (
+                <><LayoutDashboard className="w-5 h-5" /> Dashboard</>
+              ) : (
+                <><Sparkles className="w-5 h-5" /> Register Your Bot</>
+              )}
             </Link>
             <Link
               to="/watch"

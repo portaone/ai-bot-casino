@@ -71,17 +71,25 @@ export const useGameStore = create<GameState>()((set) => ({
   setTableState: (data) => set((state) => {
     const incomingBets = data.current_bets || [];
     const phase = data.phase || 'idle';
-    // During spinning/settlement, preserve existing bets if server sends empty list
-    // (bets placed during betting phase should remain visible)
-    const shouldPreserveBets = (phase === 'spinning' || phase === 'settlement')
-      && incomingBets.length === 0 && state.currentBets.length > 0;
+
+    // Determine currentBets based on phase:
+    // - betting: use server data (cleared at round start, then bets accumulate via addBet)
+    // - spinning/settlement: always preserve existing bets (they should stay visible)
+    // - idle/pause: use server data
+    let currentBets: BetRecord[];
+    if (phase === 'spinning' || phase === 'settlement') {
+      // Keep whatever bets we have — either from addBet during betting or from server
+      currentBets = state.currentBets.length > 0 ? state.currentBets : incomingBets;
+    } else {
+      currentBets = incomingBets;
+    }
 
     return {
       phase,
       timeRemaining: data.time_remaining || 0,
       roundNumber: data.round_number || 0,
       seatedBots: data.seated_bots || [],
-      currentBets: shouldPreserveBets ? state.currentBets : incomingBets,
+      currentBets,
     };
   }),
 

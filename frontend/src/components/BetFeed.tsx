@@ -1,6 +1,6 @@
 import { useGameStore } from '@/store/gameStore';
 import { BotAvatar } from './BotAvatar';
-import { Trophy, X } from 'lucide-react';
+import { Trophy, X, MessageCircle } from 'lucide-react';
 import { getColor } from '@/tokens';
 
 interface RoundResultData {
@@ -110,6 +110,7 @@ function RoundResultView({ result, onClose }: { result: RoundResultData; onClose
 export function BetFeed() {
   const phase = useGameStore((s) => s.phase);
   const currentBets = useGameStore((s) => s.currentBets);
+  const chatMessages = useGameStore((s) => s.chatMessages);
   const latestResult = useGameStore((s) => s.latestResult);
   const selectedRound = useGameStore((s) => s.selectedRound);
   const selectRound = useGameStore((s) => s.selectRound);
@@ -126,8 +127,19 @@ export function BetFeed() {
     return <RoundResultView result={latestResult} />;
   }
 
-  // Live bets view (during betting/spinning)
-  const displayBets = [...currentBets].reverse().slice(0, 10);
+  // Build a combined feed of bets and chat messages, most recent first
+  type FeedItem =
+    | { kind: 'bet'; data: typeof currentBets[0]; ts: number }
+    | { kind: 'chat'; data: typeof chatMessages[0]; ts: number };
+
+  const feedItems: FeedItem[] = [
+    ...currentBets.map((b, i) => ({ kind: 'bet' as const, data: b, ts: i })),
+    ...chatMessages.slice(-15).map((m) => ({ kind: 'chat' as const, data: m, ts: m.timestamp })),
+  ];
+
+  // Sort: bets first (by order), then interleave chats by timestamp
+  // For display: reverse so newest is at top, limit to 15
+  const displayItems = feedItems.slice(-15).reverse();
 
   const emptyMessage = phase === 'betting'
     ? 'Waiting for bets...'
@@ -137,29 +149,56 @@ export function BetFeed() {
 
   return (
     <div className="bg-card rounded-xl border border-white/5 p-4 h-full">
-      <div className="text-xs text-text-muted font-mono tracking-wider mb-3">LIVE BETS</div>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="text-xs text-text-muted font-mono tracking-wider">LIVE BETS</div>
+        {chatMessages.length > 0 && (
+          <>
+            <span className="text-text-muted text-xs">&</span>
+            <div className="flex items-center gap-1 text-xs text-text-muted font-mono tracking-wider">
+              <MessageCircle className="w-3 h-3" />
+              CHAT
+            </div>
+          </>
+        )}
+      </div>
       <div className="space-y-2 overflow-y-auto max-h-[400px]">
-        {displayBets.length === 0 ? (
+        {displayItems.length === 0 ? (
           <div className="text-text-muted text-sm py-4 text-center">
             {emptyMessage}
           </div>
         ) : (
-          displayBets.map((bet, i) => (
-            <div key={i} className="flex items-center gap-3 bg-surface/50 rounded-lg px-3 py-2 animate-slide-in">
-              <BotAvatar seed={bet.bot_avatar_seed} size={28} />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-text-primary truncate">{bet.bot_name}</div>
-              </div>
-              <div className="text-right flex items-baseline gap-2">
-                <span className={`text-xs font-medium ${getBetColor(bet.bet_type)}`}>
-                  {formatBetType(bet.bet_type, bet.bet_value)}
-                </span>
-                <span className="text-sm font-bold text-gold font-mono">
-                  {bet.amount} BC
-                </span>
-              </div>
-            </div>
-          ))
+          displayItems.map((item, i) => {
+            if (item.kind === 'bet') {
+              const bet = item.data;
+              return (
+                <div key={`bet-${i}`} className="flex items-center gap-3 bg-surface/50 rounded-lg px-3 py-2 animate-slide-in">
+                  <BotAvatar seed={bet.bot_avatar_seed} size={28} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-text-primary truncate">{bet.bot_name}</div>
+                  </div>
+                  <div className="text-right flex items-baseline gap-2">
+                    <span className={`text-xs font-medium ${getBetColor(bet.bet_type)}`}>
+                      {formatBetType(bet.bet_type, bet.bet_value)}
+                    </span>
+                    <span className="text-sm font-bold text-gold font-mono">
+                      {bet.amount} BC
+                    </span>
+                  </div>
+                </div>
+              );
+            } else {
+              const msg = item.data;
+              return (
+                <div key={`chat-${i}`} className="flex items-start gap-3 px-3 py-1.5 animate-slide-in">
+                  <BotAvatar seed={msg.bot_avatar_seed} size={22} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs text-text-muted font-mono">{msg.bot_name}:</span>
+                    <span className="text-xs text-text-secondary ml-1.5">{msg.message}</span>
+                  </div>
+                </div>
+              );
+            }
+          })
         )}
       </div>
     </div>

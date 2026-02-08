@@ -6,7 +6,7 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const mountedRef = useRef(true);
-  const { setTableState, addBet, setResult, setLeaderboard, setConnected, setPhase } = useGameStore();
+  const { setTableState, addBet, addChatMessage, setResult, setLeaderboard, setConnected, setPhase } = useGameStore();
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -52,6 +52,16 @@ export function useWebSocket() {
             }
             break;
 
+          case 'chat_message':
+            addChatMessage({
+              bot_id: data.bot_id,
+              bot_name: data.bot_name,
+              bot_avatar_seed: data.bot_avatar_seed,
+              message: data.message,
+              timestamp: Date.now(),
+            });
+            break;
+
           case 'round_result':
             // Settlement phase — backend doesn't send a separate phase_change for this,
             // so we set the phase here to ensure BetFeed shows results instead of empty bets
@@ -89,7 +99,7 @@ export function useWebSocket() {
     };
 
     wsRef.current = ws;
-  }, [setTableState, addBet, setResult, setLeaderboard, setConnected, setPhase]);
+  }, [setTableState, addBet, addChatMessage, setResult, setLeaderboard, setConnected, setPhase]);
 
   useEffect(() => {
     mountedRef.current = true;

@@ -33,6 +33,14 @@ interface LeaderboardEntry {
   trend: string;
 }
 
+interface ChatMessage {
+  bot_id: string;
+  bot_name: string;
+  bot_avatar_seed: string;
+  message: string;
+  timestamp: number;
+}
+
 interface GameState {
   phase: 'idle' | 'betting' | 'spinning' | 'settlement' | 'pause';
   timeRemaining: number;
@@ -40,6 +48,7 @@ interface GameState {
   tableId: string;
   seatedBots: Array<{ bot_id: string; name: string; avatar_seed: string; avatar_style: string }>;
   currentBets: BetRecord[];
+  chatMessages: ChatMessage[];
   latestResult: RoundResult | null;
   resultHistory: number[];
   roundHistory: RoundResult[];
@@ -50,6 +59,7 @@ interface GameState {
   setPhase: (phase: GameState['phase'], timeRemaining: number) => void;
   setTableState: (data: any) => void;
   addBet: (bet: BetRecord) => void;
+  addChatMessage: (msg: ChatMessage) => void;
   setResult: (result: RoundResult) => void;
   setLeaderboard: (entries: LeaderboardEntry[]) => void;
   setConnected: (connected: boolean) => void;
@@ -64,6 +74,7 @@ export const useGameStore = create<GameState>()((set) => ({
   tableId: 'main',
   seatedBots: [],
   currentBets: [],
+  chatMessages: [],
   latestResult: null,
   resultHistory: [],
   roundHistory: [],
@@ -97,6 +108,10 @@ export const useGameStore = create<GameState>()((set) => ({
       currentBets,
     };
   }),
+
+  addChatMessage: (msg) => set((state) => ({
+    chatMessages: [...state.chatMessages, msg].slice(-50),
+  })),
 
   addBet: (bet) => set((state) => {
     // Deduplicate: skip if identical bet already exists (same bot, type, value, amount)

@@ -9,6 +9,7 @@ Usage:
 """
 import argparse
 import asyncio
+import random
 import signal
 import sys
 import logging
@@ -18,6 +19,7 @@ from typing import Optional
 import httpx
 
 from strategies import get_strategy, BotState, RED_NUMBERS
+from phrases import BET_PHRASES, WIN_PHRASES, LOSE_PHRASES
 
 logging.basicConfig(
     level=logging.INFO,
@@ -194,6 +196,11 @@ class CasinoBot:
             if bet_value is not None:
                 bet_desc += f" ({bet_value})"
             logger.info(f"Bet placed: {bet_desc}")
+
+            # Send a random bet phrase ~60% of the time
+            if random.random() < 0.6:
+                await self._send_chat(random.choice(BET_PHRASES))
+
             return True
         except httpx.HTTPStatusError as e:
             logger.warning(f"Bet failed ({e.response.status_code}): {e.response.text}")
@@ -264,6 +271,11 @@ class CasinoBot:
             f"{emoji}{abs(net)} BC | Balance: {self.state.balance} BC"
         )
 
+        # Send a reaction phrase ~70% of the time
+        if random.random() < 0.7:
+            phrase = random.choice(WIN_PHRASES) if won else random.choice(LOSE_PHRASES)
+            await self._send_chat(phrase)
+
     async def _try_refill(self):
         """Try to refill BotChips."""
         try:
@@ -277,6 +289,24 @@ class CasinoBot:
             logger.warning(f"Refill failed: {e.response.text}")
         except Exception as e:
             logger.warning(f"Refill error: {e}")
+
+    async def _send_chat(self, message: str):
+        """Send a chat message to the table."""
+        try:
+            resp = await self.client.post(
+                f"/api/v1/tables/{self.table_id}/chat",
+                json={"message": message},
+            )
+            resp.raise_for_status()
+            if self.verbose:
+                logger.debug(f"Chat sent: {message}")
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                pass  # Rate limited, silently skip
+            elif self.verbose:
+                logger.debug(f"Chat failed ({e.response.status_code}): {e.response.text}")
+        except Exception:
+            pass  # Chat is non-critical, don't disrupt gameplay
 
     async def _rejoin_table(self):
         """Attempt to rejoin the table (e.g., after server restart)."""

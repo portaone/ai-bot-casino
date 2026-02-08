@@ -1,6 +1,9 @@
 """Game API endpoints - table management and betting."""
 import logging
+import re
+import time
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from request_trace import RouteWithLogging
 from auth import get_current_bot
 from core.types import PlaceBetRequest
@@ -20,6 +23,36 @@ def _get_engine():
     if game_engine is None:
         raise HTTPException(status_code=503, detail="Game engine not initialized")
     return game_engine
+
+
+# Chat rate limiting: bot_id -> last_message_time
+_chat_rate_limits: dict[str, float] = {}
+CHAT_RATE_LIMIT_SECONDS = 5.0
+CHAT_MAX_LENGTH = 200
+
+# Pattern to detect URLs, emails, and other spammy content
+_URL_PATTERN = re.compile(
+    r'(https?://|www\.|\.com|\.net|\.org|\.io|\.xyz|\.info|\.ru|'
+    r'\.cn|\.tk|@[\w.-]+\.\w|bit\.ly|t\.co|tinyurl|discord\.gg)',
+    re.IGNORECASE,
+)
+
+
+class ChatMessageRequest(BaseModel):
+    """Chat message from a bot."""
+    message: str = Field(min_length=1, max_length=CHAT_MAX_LENGTH)
+
+
+def _sanitize_chat(message: str) -> str:
+    """Sanitize chat message: strip whitespace, remove control characters, check for URLs."""
+    # Strip and collapse whitespace
+    cleaned = ' '.join(message.split())
+    # Remove control characters
+    cleaned = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', cleaned)
+    # Check for URLs/spam patterns
+    if _URL_PATTERN.search(cleaned):
+        raise HTTPException(status_code=400, detail="URLs and links are not allowed in chat")
+    return cleaned
 
 
 @router.get("/games")
@@ -142,3 +175,53 @@ async def latest_round(bot_data: dict = Depends(get_current_bot)):
         return {"message": "No rounds played yet", "result": None}
     logger.info(f"Bot {bot_data['bot_id']} retrieved latest round result")
     return engine.table.last_result.model_dump()
+
+
+@router.post("/tables/{table_id}/chat")
+async def send_chat(
+    table_id: str,
+    req: ChatMessageRequest,
+    bot_data: dict = Depends(get_current_bot),
+):
+    """Send a chat message to the table. Rate limited to 1 message per 5 seconds."""
+    engine = _get_engine()
+    bot = bot_data["bot"]
+    bot_id = bot_data["bot_id"]
+
+    # Verify bot is seated at table
+    if not engine.table.is_seated(bot_id):
+        raise HTTPException(status_code=400, detail="Must be seated at table to chat")
+
+    # Rate limit
+    now = time.time()
+    last_msg_time = _chat_rate_limits.get(bot_id, 0)
+    if now - last_msg_time < CHAT_RATE_LIMIT_SECONDS:
+        remaining = CHAT_RATE_LIMIT_SECONDS - (now - last_msg_time)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Chat rate limited. Try again in {remaining:.1f}s",
+        )
+
+    # Sanitize message
+    cleaned = _sanitize_chat(req.message)
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Message is empty after sanitization")
+
+    _chat_rate_limits[bot_id] = now
+
+    name = bot.name if hasattr(bot, 'name') else bot.get('name', '')
+    avatar_seed = bot.avatar_seed if hasattr(bot, 'avatar_seed') else bot.get('avatar_seed', '')
+
+    # Broadcast to spectators
+    if engine.ws_manager:
+        await engine.ws_manager.broadcast({
+            "type": "chat_message",
+            "bot_id": bot_id,
+            "bot_name": name,
+            "bot_avatar_seed": avatar_seed,
+            "message": cleaned,
+            "table_id": table_id,
+        })
+
+    logger.info(f"Chat from {bot_id} ({name}): {cleaned[:50]}{'...' if len(cleaned) > 50 else ''}")
+    return {"message": "sent"}

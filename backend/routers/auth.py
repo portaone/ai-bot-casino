@@ -157,8 +157,9 @@ async def regenerate_token_endpoint(
 async def get_me_endpoint(
     credentials: HTTPAuthorizationCredentials = Security(security),
     db_users=Depends(get_db_handle_users),
+    db_bots=Depends(get_db_handle_bots),
 ):
-    """Get current user's info plus server-side config like MCP URL."""
+    """Get current user's info plus server-side config like MCP URL and bot balance."""
     token_data = extract_jwt_data(credentials.credentials)
     user_id = token_data.get("user")
     if not user_id:
@@ -168,6 +169,13 @@ async def get_me_endpoint(
     api_base = settings.api_public_url or settings.frontend_url.replace('5173', '8080')
     data = user.model_dump()
     data["mcp_url"] = f"{api_base}/mcp"
+
+    # Include bot balance if user has a bot
+    if user.bot_id:
+        bot = db_bots.get(user.bot_id)
+        if bot:
+            data["balance"] = getattr(bot, "balance", 0)
+
     return data
 
 

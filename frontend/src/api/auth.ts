@@ -55,6 +55,7 @@ export interface UserInfo {
   bot_id?: string;
   created_at: string;
   mcp_url?: string;
+  balance?: number;
 }
 
 export const authApi = {

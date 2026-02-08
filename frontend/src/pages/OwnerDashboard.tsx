@@ -21,6 +21,7 @@ export function OwnerDashboard() {
   const { user, apiToken, mcpUrl, setAuth, accessToken } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [balance, setBalance] = useState<number | null>(null);
   const [botStats, setBotStats] = useState<BotStats>({
     rounds_played: 0,
     win_rate: 0,
@@ -41,6 +42,10 @@ export function OwnerDashboard() {
         // Store mcp_url from backend (uses API_PUBLIC_URL setting)
         if (response.data.mcp_url) {
           useAuthStore.setState({ mcpUrl: response.data.mcp_url });
+        }
+        // Store bot balance
+        if (response.data.balance !== undefined) {
+          setBalance(response.data.balance);
         }
 
         setBotStats({
@@ -249,7 +254,7 @@ export function OwnerDashboard() {
               <p className="text-text-secondary mb-4">Bot ID: {user?.bot_id}</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-display font-bold text-gold">
-                  10,000
+                  {balance !== null ? balance.toLocaleString() : '—'}
                 </span>
                 <span className="text-text-secondary font-mono">BotChips</span>
               </div>

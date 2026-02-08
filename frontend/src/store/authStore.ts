@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 interface AuthState {
   accessToken: string | null;
   apiToken: string | null;
+  mcpUrl: string | null;
   user: {
     id: string;
     first_name: string;
@@ -12,7 +13,7 @@ interface AuthState {
   } | null;
 
   setAuth: (token: string, user: any) => void;
-  setApiToken: (token: string) => void;
+  setApiToken: (token: string, mcpUrl?: string) => void;
   logout: () => void;
   isAuthenticated: () => boolean;
 }
@@ -22,6 +23,7 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       accessToken: null,
       apiToken: null,
+      mcpUrl: null,
       user: null,
 
       setAuth: (token, user) => {
@@ -29,13 +31,13 @@ export const useAuthStore = create<AuthState>()(
         set({ accessToken: token, user });
       },
 
-      setApiToken: (token) => {
-        set({ apiToken: token });
+      setApiToken: (token, mcpUrl?) => {
+        set({ apiToken: token, ...(mcpUrl ? { mcpUrl } : {}) });
       },
 
       logout: () => {
         localStorage.removeItem('aibotcasino-token');
-        set({ accessToken: null, apiToken: null, user: null });
+        set({ accessToken: null, apiToken: null, mcpUrl: null, user: null });
       },
 
       isAuthenticated: () => !!get().accessToken,
@@ -45,6 +47,7 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         accessToken: state.accessToken,
         apiToken: state.apiToken,
+        mcpUrl: state.mcpUrl,
         user: state.user,
       }),
     }

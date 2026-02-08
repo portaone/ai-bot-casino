@@ -18,7 +18,7 @@ interface BotStats {
 
 export function OwnerDashboard() {
   const navigate = useNavigate();
-  const { user, apiToken, setAuth, accessToken } = useAuthStore();
+  const { user, apiToken, mcpUrl, setAuth, accessToken } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [botStats, setBotStats] = useState<BotStats>({
@@ -91,7 +91,7 @@ export function OwnerDashboard() {
       });
 
       const { setApiToken } = useAuthStore.getState();
-      setApiToken(response.data.api_token);
+      setApiToken(response.data.api_token, response.data.mcp_url);
       setNewApiToken(response.data.api_token);
       setNewMcpUrl(response.data.mcp_url);
       setBotSetupStep('success');
@@ -114,7 +114,7 @@ export function OwnerDashboard() {
     try {
       const response = await authApi.regenerateToken();
       const { setApiToken } = useAuthStore.getState();
-      setApiToken(response.data.api_token);
+      setApiToken(response.data.api_token, response.data.mcp_url);
       setShowRegenConfirm(false);
     } catch (err: any) {
       setRegenError(err.response?.data?.detail || 'Failed to regenerate token. Please try again.');
@@ -312,7 +312,7 @@ export function OwnerDashboard() {
 
           {apiToken ? (
             <>
-              <ApiCredentials apiToken={apiToken} mcpUrl={`${config.apiUrl}/mcp`} />
+              <ApiCredentials apiToken={apiToken} mcpUrl={mcpUrl || `${config.apiUrl}/mcp`} />
               <p className="text-accent-red text-sm mt-3 font-mono">
                 Save this token — it won't be shown again.
               </p>

@@ -212,6 +212,21 @@ class CasinoBot:
 
             return True
         except httpx.HTTPStatusError as e:
+            # Auto-rejoin if we lost our seat (e.g. after backend restart)
+            if e.response.status_code == 400 and "NOT_SEATED" in e.response.text:
+                logger.warning("Not seated — rejoining table and retrying bet...")
+                await self._rejoin_table()
+                try:
+                    retry = await self.client.post(
+                        f"/api/v1/tables/{self.table_id}/bet",
+                        json=payload,
+                    )
+                    retry.raise_for_status()
+                    logger.info(f"Bet placed after rejoin: {amount} BC on {bet_type}")
+                    return True
+                except Exception as retry_err:
+                    logger.warning(f"Bet retry after rejoin failed: {retry_err}")
+                    return False
             logger.warning(f"Bet failed ({e.response.status_code}): {e.response.text}")
             return False
         except Exception as e:

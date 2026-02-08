@@ -24,3 +24,19 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+  # Optional: test bot — set API_TOKEN before starting
+  # docker compose up test-bot
+  test-bot:
+    build: ./test-bot
+    environment:
+      - API_URL=http://backend:8080
+      - API_TOKEN=${BOT_API_TOKEN:-CHANGE_ME}
+      - STRATEGY=${BOT_STRATEGY:-random}
+      - BET_SIZE=${BOT_BET_SIZE:-10}
+      - POLL_INTERVAL=2.0
+    depends_on:
+      backend:
+        condition: service_healthy
+    profiles:
+      - bot

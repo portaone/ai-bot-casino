@@ -4,11 +4,15 @@ AI Bot Casino - Test Bot Client
 Connects to the casino REST API and plays European roulette
 with configurable betting strategies.
 
-Usage:
+Usage (CLI):
     python bot.py --api-url http://localhost:8080 --token YOUR_TOKEN --strategy flat-red
+
+Usage (env vars, e.g. Cloud Run Job):
+    API_URL=https://play.aibotcasino.com  API_TOKEN=abc_sk_...  STRATEGY=random  python bot.py
 """
 import argparse
 import asyncio
+import os
 import random
 import signal
 import sys
@@ -364,35 +368,56 @@ class CasinoBot:
 
 def main():
     parser = argparse.ArgumentParser(description="AI Bot Casino - Test Bot Client")
-    parser.add_argument("--api-url", required=True, help="Casino API base URL")
-    parser.add_argument("--token", required=True, help="Bot API token")
-    parser.add_argument("--strategy", default="random", help="Betting strategy (default: random)")
-    parser.add_argument("--table", default="main", help="Table ID (default: main)")
-    parser.add_argument("--bet-size", type=int, default=10, help="Base bet size (default: 10)")
+    parser.add_argument("--api-url", default=None, help="Casino API base URL (env: API_URL)")
+    parser.add_argument("--token", default=None, help="Bot API token (env: API_TOKEN)")
+    parser.add_argument("--strategy", default=None, help="Betting strategy (env: STRATEGY, default: random)")
+    parser.add_argument("--table", default=None, help="Table ID (env: TABLE_ID, default: main)")
+    parser.add_argument("--bet-size", type=int, default=None, help="Base bet size (env: BET_SIZE, default: 10)")
     parser.add_argument("--lucky-number", type=int, default=None, help="Lucky number for flat-number (0-36)")
-    parser.add_argument("--max-rounds", type=int, default=None, help="Stop after N rounds")
-    parser.add_argument("--min-balance", type=int, default=0, help="Stop if balance drops below")
-    parser.add_argument("--poll-interval", type=float, default=2.0, help="Seconds between polls (default: 2.0)")
-    parser.add_argument("--no-refill", action="store_true", help="Disable auto-refill")
-    parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+    parser.add_argument("--max-rounds", type=int, default=None, help="Stop after N rounds (env: MAX_ROUNDS)")
+    parser.add_argument("--min-balance", type=int, default=None, help="Stop if balance drops below (env: MIN_BALANCE)")
+    parser.add_argument("--poll-interval", type=float, default=None, help="Seconds between polls (env: POLL_INTERVAL, default: 2.0)")
+    parser.add_argument("--no-refill", action="store_true", help="Disable auto-refill (env: NO_REFILL=1)")
+    parser.add_argument("--verbose", action="store_true", help="Enable debug logging (env: VERBOSE=1)")
 
     args = parser.parse_args()
 
-    if args.verbose:
+    # Resolve values: CLI args > env vars > defaults
+    api_url = args.api_url or os.environ.get("API_URL")
+    token = args.token or os.environ.get("API_TOKEN")
+    strategy = args.strategy or os.environ.get("STRATEGY", "random")
+    table = args.table or os.environ.get("TABLE_ID", "main")
+    bet_size = args.bet_size if args.bet_size is not None else int(os.environ.get("BET_SIZE", "10"))
+    lucky_number = args.lucky_number
+    max_rounds_str = os.environ.get("MAX_ROUNDS")
+    max_rounds = args.max_rounds if args.max_rounds is not None else (int(max_rounds_str) if max_rounds_str else None)
+    min_balance = args.min_balance if args.min_balance is not None else int(os.environ.get("MIN_BALANCE", "0"))
+    poll_interval = args.poll_interval if args.poll_interval is not None else float(os.environ.get("POLL_INTERVAL", "2.0"))
+    no_refill = args.no_refill or os.environ.get("NO_REFILL", "").lower() in ("1", "true", "yes")
+    verbose = args.verbose or os.environ.get("VERBOSE", "").lower() in ("1", "true", "yes")
+
+    if not api_url:
+        logger.error("API URL is required. Use --api-url or set API_URL env var.")
+        sys.exit(1)
+    if not token:
+        logger.error("API token is required. Use --token or set API_TOKEN env var.")
+        sys.exit(1)
+
+    if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
     bot = CasinoBot(
-        api_url=args.api_url,
-        token=args.token,
-        strategy_name=args.strategy,
-        table_id=args.table,
-        bet_size=args.bet_size,
-        lucky_number=args.lucky_number,
-        max_rounds=args.max_rounds,
-        min_balance=args.min_balance,
-        poll_interval=args.poll_interval,
-        no_refill=args.no_refill,
-        verbose=args.verbose,
+        api_url=api_url,
+        token=token,
+        strategy_name=strategy,
+        table_id=table,
+        bet_size=bet_size,
+        lucky_number=lucky_number,
+        max_rounds=max_rounds,
+        min_balance=min_balance,
+        poll_interval=poll_interval,
+        no_refill=no_refill,
+        verbose=verbose,
     )
 
     # Signal handling for graceful shutdown

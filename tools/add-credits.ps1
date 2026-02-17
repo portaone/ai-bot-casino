@@ -3,8 +3,8 @@
     Add BotChips credits to a bot in Firestore.
 
 .DESCRIPTION
-    Reads the current balance of a bot from Firestore and adds the specified
-    amount. Uses the gcloud firestore CLI.
+    Reads the current balance of a bot from Firestore via the REST API
+    and adds the specified amount.
 
 .PARAMETER BotId
     The bot UUID. Required.
@@ -45,21 +45,34 @@ Write-Host "Bot ID:  $BotId" -ForegroundColor Gray
 Write-Host "Adding:  $Amount BotChips" -ForegroundColor Gray
 Write-Host ""
 
-# Read current balance
-Write-Host "Reading current balance..." -ForegroundColor Cyan
-$doc = gcloud firestore documents get "projects/$ProjectId/databases/$DatabaseId/documents/Bots/$BotId" --format=json 2>$null
-
-if ($LASTEXITCODE -ne 0 -or -not $doc) {
-    Write-Host "ERROR: Bot '$BotId' not found in Firestore." -ForegroundColor Red
+$accessToken = gcloud auth print-access-token 2>$null
+if (-not $accessToken) {
+    Write-Host "ERROR: Failed to get access token. Run 'gcloud auth login' first." -ForegroundColor Red
     exit 1
 }
 
-$parsed = $doc | ConvertFrom-Json
-$currentBalance = 0
-if ($parsed.fields.balance.integerValue) {
-    $currentBalance = [int]$parsed.fields.balance.integerValue
+$headers = @{
+    "Authorization" = "Bearer $accessToken"
+    "Content-Type"  = "application/json"
 }
-$botName = $parsed.fields.name.stringValue
+
+$baseUrl = "https://firestore.googleapis.com/v1/projects/$ProjectId/databases/$DatabaseId/documents"
+
+# Read current document
+Write-Host "Reading current balance..." -ForegroundColor Cyan
+
+try {
+    $doc = Invoke-RestMethod -Uri "$baseUrl/Bots/$BotId" -Method GET -Headers $headers
+} catch {
+    Write-Host "ERROR: Bot '$BotId' not found in Firestore. $_" -ForegroundColor Red
+    exit 1
+}
+
+$currentBalance = 0
+if ($doc.fields.balance.integerValue) {
+    $currentBalance = [int]$doc.fields.balance.integerValue
+}
+$botName = $doc.fields.name.stringValue
 
 $newBalance = $currentBalance + $Amount
 
@@ -71,36 +84,23 @@ Write-Host "New balance:     $newBalance BC (+$Amount)" -ForegroundColor Green
 Write-Host ""
 Write-Host "Updating Firestore..." -ForegroundColor Cyan
 
-gcloud firestore documents update "projects/$ProjectId/databases/$DatabaseId/documents/Bots/$BotId" `
-    --update-fields="balance=$newBalance" `
-    --quiet 2>$null
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "[OK] Balance updated: $currentBalance -> $newBalance BC" -ForegroundColor Green
-} else {
-    # Fallback: try using the REST API via gcloud
-    Write-Host "Direct update failed, trying REST API..." -ForegroundColor Yellow
-
-    $accessToken = gcloud auth print-access-token 2>$null
-    $apiUrl = "https://firestore.googleapis.com/v1/projects/$ProjectId/databases/$DatabaseId/documents/Bots/$BotId`?updateMask.fieldPaths=balance"
-
-    $body = @{
-        fields = @{
-            balance = @{
-                integerValue = "$newBalance"
-            }
+$body = @{
+    fields = @{
+        balance = @{
+            integerValue = "$newBalance"
         }
-    } | ConvertTo-Json -Depth 5
-
-    try {
-        $response = Invoke-RestMethod -Uri $apiUrl -Method PATCH -Headers @{
-            "Authorization" = "Bearer $accessToken"
-            "Content-Type" = "application/json"
-        } -Body $body
-
-        Write-Host "[OK] Balance updated via REST API: $currentBalance -> $newBalance BC" -ForegroundColor Green
-    } catch {
-        Write-Host "ERROR: Failed to update balance. $_" -ForegroundColor Red
-        exit 1
     }
+} | ConvertTo-Json -Depth 5
+
+try {
+    $response = Invoke-RestMethod `
+        -Uri "$baseUrl/Bots/$BotId`?updateMask.fieldPaths=balance" `
+        -Method PATCH `
+        -Headers $headers `
+        -Body $body
+
+    Write-Host "[OK] Balance updated: $currentBalance -> $newBalance BC" -ForegroundColor Green
+} catch {
+    Write-Host "ERROR: Failed to update balance. $_" -ForegroundColor Red
+    exit 1
 }

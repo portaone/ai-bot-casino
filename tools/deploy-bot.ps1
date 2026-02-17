@@ -122,6 +122,51 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "[OK] Job '$JobName' deployed" -ForegroundColor Green
 
+# --- Cloud Scheduler (auto-restart) ------------------------------------------
+
+Write-Host ""
+Write-Host "Setting up Cloud Scheduler to auto-restart the bot..." -ForegroundColor Cyan
+
+$schedulerName = "$JobName-scheduler"
+$saEmail = (gcloud run jobs describe $JobName --region $Region --format="value(spec.template.spec.template.spec.serviceAccountName)" 2>$null)
+if (-not $saEmail) {
+    # Fallback: use default compute service account
+    $projectNumber = gcloud projects describe $ProjectId --format="value(projectNumber)" 2>$null
+    $saEmail = "$projectNumber-compute@developer.gserviceaccount.com"
+}
+
+$existingScheduler = gcloud scheduler jobs list --location $Region --format="value(name)" 2>$null | Where-Object { $_ -match $schedulerName }
+
+$schedulerUri = "https://$Region-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$ProjectId/jobs/$JobName`:run"
+
+if ($existingScheduler) {
+    Write-Host "Updating existing scheduler..." -ForegroundColor Gray
+    gcloud scheduler jobs update http $schedulerName `
+        --location $Region `
+        --schedule "0 */6 * * *" `
+        --uri $schedulerUri `
+        --http-method POST `
+        --oauth-service-account-email $saEmail `
+        --quiet 2>$null
+} else {
+    Write-Host "Creating scheduler (runs every 6 hours)..." -ForegroundColor Gray
+    gcloud scheduler jobs create http $schedulerName `
+        --location $Region `
+        --schedule "0 */6 * * *" `
+        --uri $schedulerUri `
+        --http-method POST `
+        --oauth-service-account-email $saEmail `
+        --quiet 2>$null
+}
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "[OK] Scheduler '$schedulerName' configured (every 6 hours)" -ForegroundColor Green
+} else {
+    Write-Host "WARNING: Scheduler setup failed. The bot job won't auto-restart." -ForegroundColor Yellow
+    Write-Host "  You may need to enable the Cloud Scheduler API:" -ForegroundColor Yellow
+    Write-Host "  gcloud services enable cloudscheduler.googleapis.com" -ForegroundColor Yellow
+}
+
 # --- Execute the job ---------------------------------------------------------
 
 Write-Host ""
@@ -144,18 +189,19 @@ Write-Host "============================================================" -Foreg
 Write-Host @"
 
   Job name:    $JobName
+  Scheduler:   $schedulerName (every 6 hours)
   Image:       $ImageTag
   Strategy:    $Strategy
   Bet size:    $BetSize
   API URL:     $ApiUrl
-  Timeout:     24h (auto-restarts up to 3 times)
+  Timeout:     24h (auto-restarts up to 3 retries, then scheduler re-launches)
 
   Useful commands:
     # View logs
     gcloud run jobs executions list --job $JobName --region $Region
     gcloud logging read "resource.type=cloud_run_job AND resource.labels.job_name=$JobName" --limit 50
 
-    # Re-run the bot
+    # Re-run the bot now
     gcloud run jobs execute $JobName --region $Region
 
     # Stop current execution
@@ -165,5 +211,9 @@ Write-Host @"
     # Update strategy
     gcloud run jobs update $JobName --region $Region --set-env-vars "STRATEGY=martingale-red"
     gcloud run jobs execute $JobName --region $Region
+
+    # Disable/enable auto-restart
+    gcloud scheduler jobs pause $schedulerName --location $Region
+    gcloud scheduler jobs resume $schedulerName --location $Region
 
 "@ -ForegroundColor White
